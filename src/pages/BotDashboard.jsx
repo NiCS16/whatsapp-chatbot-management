@@ -33,55 +33,56 @@ export default function BotDashboard({ bot, onBack }) {
   const [chatInput, setChatInput] = useState("");
   
   // Customer analysis states
-  const [customers] = useState({
-    budi: {
-      name: "Budi Santoso",
-      phone: "+628123456789",
-      location: "Jakarta, Indonesia",
-      lastChat: "2023-06-15T14:30:00Z",
-      type: "prospect",
-      sentiment: "positive",
-      needs: "Water heater installation",
-      status: "Active - Needs follow up",
-      aiEnabled: true,
-      interactions: [
-        { date: "15 Jun 2023 14:30", status: "Completed", note: "Asked about product specifications" },
-        { date: "14 Jun 2023 10:15", status: "Pending", note: "Requested price quotation" }
-      ],
-      action: "Send follow-up message with installation options and pricing"
-    },
-    anton: {
-      name: "Anton Wijaya",
-      phone: "+628987654321",
-      location: "Bandung, Indonesia",
-      lastChat: "2023-06-14T09:15:00Z",
-      type: "customer",
-      sentiment: "neutral",
-      needs: "Product maintenance",
-      status: "Waiting for response",
-      aiEnabled: true,
-      interactions: [
-        { date: "12 Jun 2023 09:30", status: "Completed", note: "Reported maintenance issue" },
-        { date: "10 Jun 2023 16:45", status: "Completed", note: "Initial inquiry" }
-      ],
-      action: "Schedule technician visit and send confirmation"
-    },
-    rusli: {
-      name: "Rusli Abdullah",
-      phone: "+628567891234",
-      location: "Surabaya, Indonesia",
-      lastChat: "2023-06-18T11:20:00Z",
-      type: "prospect",
-      sentiment: "negative",
-      needs: "New product inquiry",
-      status: "New lead",
-      aiEnabled: false,
-      interactions: [
-        { date: "18 Jun 2023 11:20", status: "New", note: "Initial contact" }
-      ],
-      action: "Send product catalog and schedule demo"
-    }
-  });
+  // Customer analysis states - CHANGE FROM CONST TO STATE
+const [customers, setCustomers] = useState({
+  budi: {
+    name: "Budi Santoso",
+    phone: "+628123456789",
+    location: "Jakarta, Indonesia",
+    lastChat: "2023-06-15T14:30:00Z",
+    type: "prospect",
+    sentiment: "positive",
+    needs: "Water heater installation",
+    status: "Active - Needs follow up",
+    aiEnabled: true,
+    interactions: [
+      { date: "15 Jun 2023 14:30", status: "Completed", note: "Asked about product specifications" },
+      { date: "14 Jun 2023 10:15", status: "Pending", note: "Requested price quotation" }
+    ],
+    action: "Send follow-up message with installation options and pricing"
+  },
+  anton: {
+    name: "Anton Wijaya",
+    phone: "+628987654321",
+    location: "Bandung, Indonesia",
+    lastChat: "2023-06-14T09:15:00Z",
+    type: "customer",
+    sentiment: "neutral",
+    needs: "Product maintenance",
+    status: "Waiting for response",
+    aiEnabled: true,
+    interactions: [
+      { date: "12 Jun 2023 09:30", status: "Completed", note: "Reported maintenance issue" },
+      { date: "10 Jun 2023 16:45", status: "Completed", note: "Initial inquiry" }
+    ],
+    action: "Schedule technician visit and send confirmation"
+  },
+  rusli: {
+    name: "Rusli Abdullah",
+    phone: "+628567891234",
+    location: "Surabaya, Indonesia",
+    lastChat: "2022023-06-18T11:20:00Z",
+    type: "prospect",
+    sentiment: "negative",
+    needs: "New product inquiry",
+    status: "New lead",
+    aiEnabled: false,
+    interactions: [
+      { date: "18 Jun 2023 11:20", status: "New", note: "Initial contact" }
+    ],
+    action: "Send product catalog and schedule demo"
+  }
+});
   
   const [selectedCustomer, setSelectedCustomer] = useState('budi');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
@@ -218,11 +219,21 @@ export default function BotDashboard({ bot, onBack }) {
     setSelectedCustomer(customerId);
   };
 
-  // Toggle AI for customer
-  const toggleCustomerAI = (customerId, event) => {
-    event.stopPropagation();
-    console.log(`Toggle AI for customer: ${customerId}`);
-  };
+  // Toggle AI for customer - FIXED: Actually toggle the AI status
+const toggleCustomerAI = (customerId, event) => {
+  event.stopPropagation();
+  
+  // Update the customers state to toggle AI status
+  setCustomers(prevCustomers => ({
+    ...prevCustomers,
+    [customerId]: {
+      ...prevCustomers[customerId],
+      aiEnabled: !prevCustomers[customerId].aiEnabled
+    }
+  }));
+  
+  console.log(`Toggled AI for customer: ${customerId}`);
+};
 
   // Format date helper
   const formatDate = (dateString) => {
