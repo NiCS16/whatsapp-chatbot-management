@@ -104,7 +104,7 @@
         background: #ffffff;
         color: #2d3748;
         padding: 20px 30px;
-        margin-bottom: 0;
+        margin-bottom: 20px;
         border-bottom: 1px solid #e2e8f0;
     }
 
@@ -622,6 +622,26 @@
         border-color: #4f46e5;
         outline: 0;
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    /* Fix for select dropdowns with width:auto */
+    select.form-control {
+        width: auto;
+        min-width: 140px; /* Add a minimum width to prevent overlap */
+        padding-right: 40px; /* Ensure enough space for the arrow */
+        background-position: right 12px center; /* Position arrow properly */
+    }
+
+    /* Alternative: Use a fixed width that accommodates the content */
+    select.form-control.fixed-width {
+        width: 180px; /* Fixed width that fits the content */
+        min-width: 180px;
+    }
+
+    /* Or use dynamic width based on content */
+    select.form-control.dynamic-width {
+        width: fit-content;
+        min-width: 140px;
     }
 
     input[type="text"],
