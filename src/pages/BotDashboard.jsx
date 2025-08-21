@@ -337,7 +337,7 @@ export default function BotDashboard({ bot, onBack }) {
       
       {/* Connection Tab */}
       {activeTab === 'connection' && (
-        <div className="bot-tab-content" style={{border: '2px solid blue', padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '10px'}}>
           <div className="qr-container">
             <h3>Scan QR Code to Connect</h3>
             <img 
@@ -357,7 +357,7 @@ export default function BotDashboard({ bot, onBack }) {
       
       {/* Prompt Settings Tab */}
       {activeTab === 'prompt' && (
-        <div className="bot-tab-content" style={{border: '2px solid blue', padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '10px'}}>
           <div className="card">
             <div className="card-header">
               <h3><i className="fas fa-comment-alt"></i> AI Prompt Configuration</h3>
@@ -404,7 +404,7 @@ export default function BotDashboard({ bot, onBack }) {
       
       {/* Test Chat Tab */}
       {activeTab === 'test-chat' && (
-        <div className="bot-tab-content" style={{border: '2px solid blue', padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '10px'}}>
           <div className="chat-simulator">
             <div className="chat-header">
               <i className="fas fa-robot"></i>
@@ -438,7 +438,7 @@ export default function BotDashboard({ bot, onBack }) {
       
       {/* Analysis Tab */}
       {activeTab === 'analysis' && (
-        <div className="bot-tab-content" style={{border: '2px solid blue', padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '10px'}}>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px'}}>
             {/* Customer List */}
             <div className="card">
@@ -619,7 +619,7 @@ export default function BotDashboard({ bot, onBack }) {
       
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <div className="bot-tab-content" style={{border: '2px solid blue', padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '10px'}}>
           <div className="card">
             <div className="card-header">
               <h3><i className="fas fa-cog"></i> Bot Configuration</h3>
