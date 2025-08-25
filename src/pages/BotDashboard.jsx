@@ -102,9 +102,54 @@ const [customers, setCustomers] = useState({
     sheetsRange: ""
   });
   
-  const [aiPrompt, setAiPrompt] = useState("You are a helpful customer service assistant. Your role is to answer customer inquiries about our products, provide information, assist with troubleshooting, and guide customers through the purchasing process. Be polite, professional, and concise in your responses. If you don't know an answer, offer to connect the customer with a human representative.");
-  const [temperature, setTemperature] = useState(0.7);
-  
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+  useEffect(() => {
+    fetchPrompt();
+  }, []);
+    const fetchPrompt = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/bot/prompt');
+      if (response.ok) {
+        const data = await response.json();
+        setAiPrompt(data.prompt);
+      } else {
+        console.error('Failed to fetch prompt');
+        // Fallback to default prompt if API fails
+        setAiPrompt("You are a helpful customer service assistant. Your role is to answer customer inquiries about our products, provide information, assist with troubleshooting, and guide customers through the purchasing process. Be polite, professional, and concise in your responses. If you don't know an answer, offer to connect the customer with a human representative.");
+      }
+    } catch (error) {
+      console.error('Error fetching prompt:', error);
+      // Fallback to default prompt if API fails
+      setAiPrompt("You are a helpful customer service assistant. Your role is to answer customer inquiries about our products, provide information, assist with troubleshooting, and guide customers through the purchasing process. Be polite, professional, and concise in your responses. If you don't know an answer, offer to connect the customer with a human representative.");
+    }
+  };
+
+  // Function to save prompt to backend
+  const savePrompt = async () => {
+    setIsSavingPrompt(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/bot/prompt', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      
+      if (response.ok) {
+        alert('Prompt saved successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to save prompt: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving prompt:', error);
+      alert('Failed to save prompt. Please try again.');
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
   const chatMessagesRef = useRef(null);
 
   useEffect(() => {
@@ -367,85 +412,40 @@ const toggleCustomerAI = (customerId, event) => {
       )}
       
       {/* Prompt Settings Tab */}
-      {activeTab === 'prompt' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
-          <div className="card">
-            <div className="card-header">
-              <h3><i className="fas fa-comment-alt"></i> AI Prompt Configuration</h3>
-            </div>
-            <div className="card-content">
-              <div className="prompt-editor">
-                <label htmlFor="ai-prompt">Instructions for the AI assistant:</label>
-                <textarea 
-                  id="ai-prompt" 
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  rows="6"
-                  style={{width: '100%', marginTop: '10px'}}
-                />
-              </div>
-              
-              <div className="temperature-control" style={{marginTop: '20px'}}>
-                <label htmlFor="temperature">Response Creativity (Temperature): {temperature}</label>
-                <input 
-                  type="range" 
-                  id="temperature" 
-                  className="temperature-slider" 
-                  min="0" 
-                  max="1" 
-                  step="0.1" 
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  style={{width: '100%', marginTop: '10px'}}
-                />
-                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '5px'}}>
-                  <span style={{color: '#718096'}}>Precise</span>
-                  <span style={{color: '#718096'}}>Balanced</span>
-                  <span style={{color: '#718096'}}>Creative</span>
-                </div>
-              </div>
-              
-              <button className="btn btn-primary" style={{marginTop: '15px'}}>
-                <i className="fas fa-save"></i> Save Prompt
-              </button>
-            </div>
-          </div>
+ {activeTab === 'prompt' && (
+    <div className="bot-tab-content" style={{padding: '10px'}}>
+      <div className="card">
+        <div className="card-header">
+          <h3><i className="fas fa-comment-alt"></i> AI Prompt Configuration</h3>
         </div>
-      )}
-      
-      {/* Test Chat Tab */}
-      {activeTab === 'test-chat' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
-          <div className="chat-simulator">
-            <div className="chat-header">
-              <i className="fas fa-robot"></i>
-              <span>Test Chat with {currentBot.name}</span>
-            </div>
-            <div className="chat-messages" ref={chatMessagesRef}>
-              {chatMessages.map(message => (
-                <div key={message.id} className={`message message-${message.incoming ? 'incoming' : 'outgoing'}`}>
-                  <div className={`message-bubble ${message.incoming ? 'incoming-bubble' : 'outgoing-bubble'}`}>
-                    {message.text}
-                  </div>
-                  <span className="message-time">{message.time}</span>
-                </div>
-              ))}
-            </div>
-            <div className="chat-input">
-              <input 
-                type="text" 
-                placeholder="Type a message..." 
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={handleChatKeyPress}
-              />
-              <button onClick={sendTestMessage}>
-                <i className="fas fa-paper-plane"></i>
-              </button>
-            </div>
+        <div className="card-content">
+          <div className="prompt-editor">
+            <label htmlFor="ai-prompt">Instructions for the AI assistant:</label>
+            <textarea 
+              id="ai-prompt" 
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows="6"
+              style={{width: '100%', marginTop: '10px'}}
+            />
           </div>
+          
+
+          
+          <button 
+            className="btn btn-primary" 
+            style={{marginTop: '15px'}}
+            onClick={savePrompt}
+            disabled={isSavingPrompt}
+          >
+            <i className="fas fa-save"></i> 
+            {isSavingPrompt ? ' Saving...' : ' Save Prompt'}
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+  )}
+
       
       {/* Analysis Tab */}
       {activeTab === 'analysis' && (
