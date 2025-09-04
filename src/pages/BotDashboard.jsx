@@ -1,135 +1,72 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function BotDashboard({ bot, onBack }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [currentBot, setCurrentBot] = useState(bot);
+  const [loading, setLoading] = useState(false);
   
-  // Use the passed bot data or fallback to default
-  const [currentBot, setCurrentBot] = useState(
-    bot || {
-      id: 1,
-      name: "Solahart Support",
-      number: "+6281234567890",
-      status: "online",
-      purpose: "customer-support"
-    }
-  );
+  // Prompt states
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   
-  // Update currentBot when bot prop changes
+  // Analysis states
+  const [analysisResults, setAnalysisResults] = useState([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  
+  // Google Sheets states
+  const [sheetsConfig, setSheetsConfig] = useState({
+    spreadsheetId: '',
+    sheetName: 'Sheet1',
+    credentialsPath: './chatbotku-107559128562.json',
+    configured: false
+  });
+  const [isUploadingSheets, setIsUploadingSheets] = useState(false);
+  
+  const API_BASE = 'http://localhost:3001';
+
   useEffect(() => {
     if (bot) {
       setCurrentBot(bot);
+      fetchBotData();
     }
   }, [bot]);
-  
-  // Chat states
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      text: "Hello! How can I help you today?",
-      incoming: true,
-      time: "10:00 AM"
-    }
-  ]);
-  const [chatInput, setChatInput] = useState("");
-  
-  // Customer analysis states
-  // Customer analysis states - CHANGE FROM CONST TO STATE
-const [customers, setCustomers] = useState({
-  budi: {
-    name: "Budi Santoso",
-    phone: "+628123456789",
-    location: "Jakarta, Indonesia",
-    lastChat: "2023-06-15T14:30:00Z",
-    type: "prospect",
-    sentiment: "positive",
-    needs: "Water heater installation",
-    status: "Active - Needs follow up",
-    aiEnabled: true,
-    interactions: [
-      { date: "15 Jun 2023 14:30", status: "Completed", note: "Asked about product specifications" },
-      { date: "14 Jun 2023 10:15", status: "Pending", note: "Requested price quotation" }
-    ],
-    action: "Send follow-up message with installation options and pricing"
-  },
-  anton: {
-    name: "Anton Wijaya",
-    phone: "+628987654321",
-    location: "Bandung, Indonesia",
-    lastChat: "2023-06-14T09:15:00Z",
-    type: "customer",
-    sentiment: "neutral",
-    needs: "Product maintenance",
-    status: "Waiting for response",
-    aiEnabled: true,
-    interactions: [
-      { date: "12 Jun 2023 09:30", status: "Completed", note: "Reported maintenance issue" },
-      { date: "10 Jun 2023 16:45", status: "Completed", note: "Initial inquiry" }
-    ],
-    action: "Schedule technician visit and send confirmation"
-  },
-  rusli: {
-    name: "Rusli Abdullah",
-    phone: "+628567891234",
-    location: "Surabaya, Indonesia",
-    lastChat: "2022023-06-18T11:20:00Z",
-    type: "prospect",
-    sentiment: "negative",
-    needs: "New product inquiry",
-    status: "New lead",
-    aiEnabled: false,
-    interactions: [
-      { date: "18 Jun 2023 11:20", status: "New", note: "Initial contact" }
-    ],
-    action: "Send product catalog and schedule demo"
-  }
-});
-  
-  const [selectedCustomer, setSelectedCustomer] = useState('budi');
-  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
-  const [sortFilter, setSortFilter] = useState('latest');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [sentimentFilter, setSentimentFilter] = useState('all');
-  
-  // Settings states
-  const [botSettings, setBotSettings] = useState({
-    name: currentBot.name || "Bot",
-    number: currentBot.number || "",
-    description: `Official WhatsApp bot for ${currentBot.name || "customer support"} and sales inquiries.`,
-    timezone: "GMT+7",
-    enableSheets: true,
-    sheetsUrl: "",
-    sheetsTab: "",
-    sheetsRange: ""
-  });
-  
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
-  useEffect(() => {
-    fetchPrompt();
-  }, []);
-    const fetchPrompt = async () => {
+
+  const fetchBotData = async () => {
+    if (!currentBot?.name) return;
+    
     try {
-      const response = await fetch('http://localhost:3001/api/bot/prompt');
+      // Fetch prompt
+      await fetchPrompt();
+      // Fetch analysis results
+      await fetchAnalysisResults();
+      // Fetch sheets config
+      await fetchSheetsConfig();
+    } catch (error) {
+      console.error('Error fetching bot data:', error);
+    }
+  };
+
+  const fetchPrompt = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/prompt`);
       if (response.ok) {
         const data = await response.json();
         setAiPrompt(data.prompt);
       } else {
         console.error('Failed to fetch prompt');
-        // Fallback to default prompt if API fails
-        setAiPrompt("You are a helpful customer service assistant. Your role is to answer customer inquiries about our products, provide information, assist with troubleshooting, and guide customers through the purchasing process. Be polite, professional, and concise in your responses. If you don't know an answer, offer to connect the customer with a human representative.");
+        setAiPrompt("Kamu adalah asisten AI yang ramah dan membantu melalui WhatsApp.");
       }
     } catch (error) {
       console.error('Error fetching prompt:', error);
-      // Fallback to default prompt if API fails
-      setAiPrompt("You are a helpful customer service assistant. Your role is to answer customer inquiries about our products, provide information, assist with troubleshooting, and guide customers through the purchasing process. Be polite, professional, and concise in your responses. If you don't know an answer, offer to connect the customer with a human representative.");
+      setAiPrompt("Kamu adalah asisten AI yang ramah dan membantu melalui WhatsApp.");
     }
   };
 
-  // Function to save prompt to backend
   const savePrompt = async () => {
     setIsSavingPrompt(true);
     try {
-      const response = await fetch('http://localhost:3001/api/bot/prompt', {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/prompt`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -138,156 +75,161 @@ const [customers, setCustomers] = useState({
       });
       
       if (response.ok) {
-        alert('Prompt saved successfully!');
+        alert('Prompt berhasil disimpan!');
       } else {
         const errorData = await response.json();
-        alert(`Failed to save prompt: ${errorData.error}`);
+        alert(`Gagal menyimpan prompt: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error saving prompt:', error);
-      alert('Failed to save prompt. Please try again.');
+      alert('Gagal menyimpan prompt. Silakan coba lagi.');
     } finally {
       setIsSavingPrompt(false);
     }
   };
-  const chatMessagesRef = useRef(null);
 
-  useEffect(() => {
-    setBotSettings(prev => ({
-      ...prev,
-      name: currentBot.name || "Bot",
-      number: currentBot.number || "",
-      description: `Official WhatsApp bot for ${currentBot.name || "customer support"} and sales inquiries.`
-    }));
-  }, [currentBot]);
-
-  // Auto-scroll chat to bottom when new messages are added
-  useEffect(() => {
-    if (chatMessagesRef.current) {
-      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
-
-  // Tab switching
-  const switchTab = (tabId) => {
-    console.log("Switching to tab:", tabId);
-    setActiveTab(tabId);
-  };
-
-  // Handle back navigation
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
+  const fetchAnalysisResults = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/analysis`);
+      if (response.ok) {
+        const data = await response.json();
+        setAnalysisResults(data.reports || []);
+      }
+    } catch (error) {
+      console.error('Error fetching analysis results:', error);
     }
   };
 
-  // Chat functionality
-  const sendTestMessage = () => {
-    if (!chatInput.trim()) return;
-    
-    const now = new Date();
-    const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    
-    const newMessage = {
-      id: chatMessages.length + 1,
-      text: chatInput,
-      incoming: false,
-      time: timeString
-    };
-    
-    setChatMessages(prev => [...prev, newMessage]);
-    setChatInput("");
-    
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "I understand your question. Let me check that for you.",
-        "Thanks for your message! How can I assist you further?",
-        "I can help with that. Here's what I found...",
-        "That's a great question! Here's the information you requested."
-      ];
+  const startAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      const responseTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Analisis selesai! Diproses ${data.result.processed} file baru.`);
+        await fetchAnalysisResults(); // Refresh results
+      } else {
+        const errorData = await response.json();
+        alert(`Gagal melakukan analisis: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error analyzing:', error);
+      alert('Gagal melakukan analisis. Silakan coba lagi.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const viewReport = async (phoneNumber) => {
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/analysis/${phoneNumber}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedReport(data);
+      } else {
+        alert('Gagal membuka laporan');
+      }
+    } catch (error) {
+      console.error('Error fetching report:', error);
+      alert('Gagal membuka laporan');
+    }
+  };
+
+  const fetchSheetsConfig = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/sheets`);
+      if (response.ok) {
+        const data = await response.json();
+        setSheetsConfig(data);
+      }
+    } catch (error) {
+      console.error('Error fetching sheets config:', error);
+    }
+  };
+
+  const saveSheetsConfig = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/sheets`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(sheetsConfig),
+      });
       
-      const aiResponse = {
-        id: chatMessages.length + 2,
-        text: randomResponse,
-        incoming: true,
-        time: responseTime
-      };
+      if (response.ok) {
+        alert('Konfigurasi Google Sheets berhasil disimpan!');
+        await fetchSheetsConfig();
+      } else {
+        const errorData = await response.json();
+        alert(`Gagal menyimpan konfigurasi: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving sheets config:', error);
+      alert('Gagal menyimpan konfigurasi. Silakan coba lagi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadToSheets = async () => {
+    if (!sheetsConfig.spreadsheetId) {
+      alert('Silakan konfigurasi Google Sheets terlebih dahulu');
+      return;
+    }
+
+    setIsUploadingSheets(true);
+    try {
+      const response = await fetch(`${API_BASE}/bots/${currentBot.name}/upload-sheets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       
-      setChatMessages(prev => [...prev, aiResponse]);
-    }, 1000);
-  };
-
-  // Handle Enter key in chat input
-  const handleChatKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      sendTestMessage();
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Upload berhasil! Data telah disimpan ke Google Sheets.`);
+        if (data.spreadsheetUrl) {
+          window.open(data.spreadsheetUrl, '_blank');
+        }
+      } else {
+        const errorData = await response.json();
+        alert(`Gagal upload: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error uploading to sheets:', error);
+      alert('Gagal upload ke Google Sheets. Silakan coba lagi.');
+    } finally {
+      setIsUploadingSheets(false);
     }
   };
 
-  // Customer filtering and sorting
-  const getFilteredCustomers = () => {
-    let customerArray = Object.entries(customers).map(([id, customer]) => ({ id, ...customer }));
-    
-    // Apply filters
-    if (typeFilter !== 'all') {
-      customerArray = customerArray.filter(customer => customer.type === typeFilter);
-    }
-    
-    if (sentimentFilter !== 'all') {
-      customerArray = customerArray.filter(customer => customer.sentiment === sentimentFilter);
-    }
-    
-    if (customerSearchTerm) {
-      customerArray = customerArray.filter(customer => 
-        customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
-        customer.phone.includes(customerSearchTerm) ||
-        customer.location.toLowerCase().includes(customerSearchTerm.toLowerCase())
-      );
-    }
-    
-    // Apply sorting
-    if (sortFilter === 'latest') {
-      customerArray.sort((a, b) => new Date(b.lastChat) - new Date(a.lastChat));
-    } else {
-      customerArray.sort((a, b) => new Date(a.lastChat) - new Date(b.lastChat));
-    }
-    
-    return customerArray;
-  };
-
-  // Customer selection
-  const selectCustomer = (customerId) => {
-    setSelectedCustomer(customerId);
-  };
-
-  // Toggle AI for customer - FIXED: Actually toggle the AI status
-const toggleCustomerAI = (customerId, event) => {
-  event.stopPropagation();
-  
-  // Update the customers state to toggle AI status
-  setCustomers(prevCustomers => ({
-    ...prevCustomers,
-    [customerId]: {
-      ...prevCustomers[customerId],
-      aiEnabled: !prevCustomers[customerId].aiEnabled
-    }
-  }));
-  
-  console.log(`Toggled AI for customer: ${customerId}`);
-};
-
-  // Format date helper
   const formatDate = (dateString) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return date.toLocaleDateString('id-ID') + ' ' + date.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
   };
 
-  const currentCustomer = customers[selectedCustomer];
-  const filteredCustomers = getFilteredCustomers();
+  if (!currentBot) {
+    return (
+      <div className="page active">
+        <div className="page-header">
+          <h1 className="page-title">Bot tidak ditemukan</h1>
+          <button className="btn btn-outline" onClick={onBack}>
+            <i className="fas fa-arrow-left"></i> Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page active">    
@@ -295,478 +237,404 @@ const toggleCustomerAI = (customerId, event) => {
         <h1 className="page-title">
           <i className="fas fa-robot"></i> {currentBot.name} Dashboard
         </h1>
-        <button className="btn btn-outline" onClick={handleBack}>
-          <i className="fas fa-arrow-left"></i> Back to Bot Management
+        <button className="btn btn-outline" onClick={onBack}>
+          <i className="fas fa-arrow-left"></i> Kembali ke Bot Management
         </button>
       </div>
       
       <div className="bot-tabs">
         <div 
           className={`bot-tab ${activeTab === 'overview' ? 'active' : ''}`} 
-          onClick={() => switchTab('overview')}
+          onClick={() => setActiveTab('overview')}
         >
           Overview
         </div>
         <div 
-          className={`bot-tab ${activeTab === 'connection' ? 'active' : ''}`} 
-          onClick={() => switchTab('connection')}
-        >
-          Connection
-        </div>
-        <div 
           className={`bot-tab ${activeTab === 'prompt' ? 'active' : ''}`} 
-          onClick={() => switchTab('prompt')}
+          onClick={() => setActiveTab('prompt')}
         >
-          Prompt Settings
-        </div>
-        <div 
-          className={`bot-tab ${activeTab === 'test-chat' ? 'active' : ''}`} 
-          onClick={() => switchTab('test-chat')}
-        >
-          Test Chat
+          AI Prompt
         </div>
         <div 
           className={`bot-tab ${activeTab === 'analysis' ? 'active' : ''}`} 
-          onClick={() => switchTab('analysis')}
+          onClick={() => setActiveTab('analysis')}
         >
-          Analysis
+          Analisis Chat
         </div>
         <div 
-          className={`bot-tab ${activeTab === 'settings' ? 'active' : ''}`} 
-          onClick={() => switchTab('settings')}
+          className={`bot-tab ${activeTab === 'sheets' ? 'active' : ''}`} 
+          onClick={() => setActiveTab('sheets')}
         >
-          Settings
+          Google Sheets
         </div>
       </div>
       
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h3>Total Conversations</h3>
-              <div className="stat-number">1,245</div>
-              <div className="stat-label">+12% from last week</div>
-            </div>
-            <div className="stat-card">
-              <h3>Active Today</h3>
-              <div className="stat-number">42</div>
-              <div className="stat-label">+3 from yesterday</div>
-            </div>
-            <div className="stat-card">
-              <h3>Response Rate</h3>
-              <div className="stat-number">98%</div>
-              <div className="stat-label">Industry average: 92%</div>
-            </div>
-            <div className="stat-card">
-              <h3>Avg. Response Time</h3>
-              <div className="stat-number">2.3s</div>
-              <div className="stat-label">Faster than 95% of bots</div>
-            </div>
-          </div>
-                  
-          <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px'}}>
-            <div className="card">
-              <div className="card-header">
-                <h3><i className="fas fa-chart-line"></i> Conversation Trends</h3>
-              </div>
-              <div className="card-content">
-                <div style={{height: '250px', background: '#f8f9fa', border: '2px dashed #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c757d'}}>
-                  Chart.js Integration Needed
-                </div>
-              </div>
-            </div>
-                      
-            <div className="card">
-              <div className="card-header">
-                <h3><i className="fas fa-comment-dots"></i> Sentiment Analysis</h3>
-              </div>
-              <div className="card-content">
-                <div style={{height: '250px', background: '#f8f9fa', border: '2px dashed #dee2e6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c757d'}}>
-                  Chart.js Integration Needed
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Connection Tab */}
-      {activeTab === 'connection' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
-          <div className="qr-container">
-            <h3>Scan QR Code to Connect</h3>
-            <img 
-              src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://example.com/whatsapp-bot-connect" 
-              alt="QR Code" 
-            />
-            <p>Scan this QR code with WhatsApp on your phone</p>
-            <div className="connection-status connected">
-              <i className="fas fa-check-circle"></i> Connected
-            </div>
-            <button className="btn btn-danger" style={{marginTop: '15px'}}>
-              <i className="fas fa-power-off"></i> Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* Prompt Settings Tab */}
- {activeTab === 'prompt' && (
-    <div className="bot-tab-content" style={{padding: '10px'}}>
-      <div className="card">
-        <div className="card-header">
-          <h3><i className="fas fa-comment-alt"></i> AI Prompt Configuration</h3>
-        </div>
-        <div className="card-content">
-          <div className="prompt-editor">
-            <label htmlFor="ai-prompt">Instructions for the AI assistant:</label>
-            <textarea 
-              id="ai-prompt" 
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              rows="6"
-              style={{width: '100%', marginTop: '10px'}}
-            />
-          </div>
-          
-
-          
-          <button 
-            className="btn btn-primary" 
-            style={{marginTop: '15px'}}
-            onClick={savePrompt}
-            disabled={isSavingPrompt}
-          >
-            <i className="fas fa-save"></i> 
-            {isSavingPrompt ? ' Saving...' : ' Save Prompt'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
-
-      
-      {/* Analysis Tab */}
-      {activeTab === 'analysis' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px'}}>
-            {/* Customer List */}
-            <div className="card">
-              <div className="card-header">
-                <h3><i className="fas fa-users"></i> Customer List</h3>
-              </div>
-              <div className="card-content">
-                <div className="search-box">
-                  <input 
-                    type="text" 
-                    placeholder="Search customers..." 
-                    value={customerSearchTerm}
-                    onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                  />
-                  <button><i className="fas fa-search"></i></button>
-                </div>
-                
-                {/* Filter Controls */}
-                <div style={{margin: '15px 0', display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
-                  <select 
-                    className="form-control" 
-                    style={{flex: 1, minWidth: '120px'}}
-                    value={sortFilter}
-                    onChange={(e) => setSortFilter(e.target.value)}
-                  >
-                    <option value="latest">Latest First</option>
-                    <option value="oldest">Oldest First</option>
-                  </select>
-                  <select 
-                    className="form-control" 
-                    style={{flex: 1, minWidth: '120px'}}
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                  >
-                    <option value="all">All Types</option>
-                    <option value="prospect">Prospects</option>
-                    <option value="customer">Customers</option>
-                  </select>
-                  <select 
-                    className="form-control" 
-                    style={{flex: 1, minWidth: '120px'}}
-                    value={sentimentFilter}
-                    onChange={(e) => setSentimentFilter(e.target.value)}
-                  >
-                    <option value="all">All Sentiments</option>
-                    <option value="positive">Positive</option>
-                    <option value="neutral">Neutral</option>
-                    <option value="negative">Negative</option>
-                  </select>
-                </div>
-                
-                <div className="customer-list" style={{maxHeight: '400px', overflowY: 'auto'}}>
-                  {filteredCustomers.map(customer => (
-                    <div 
-                      key={customer.id}
-                      className={`customer-item ${selectedCustomer === customer.id ? 'active' : ''}`}
-                      onClick={() => selectCustomer(customer.id)}
-                    >
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                        <div>
-                          <h4>{customer.name}</h4>
-                          <p>{customer.phone}</p>
-                          <p><i className="fas fa-map-marker-alt"></i> {customer.location}</p>
-                        </div>
-                        <span className={`badge badge-${customer.type}`}>
-                          {customer.type.charAt(0).toUpperCase() + customer.type.slice(1)}
-                        </span>
-                      </div>
-                      <div className="customer-meta">
-                        <span><i className="far fa-clock"></i> {formatDate(customer.lastChat)}</span>
-                        <span className={`badge badge-${customer.sentiment}`}>
-                          {customer.sentiment.charAt(0).toUpperCase() + customer.sentiment.slice(1)}
-                        </span>
-                      </div>
-                      <div style={{marginTop: '10px', display: 'flex', justifyContent: 'space-between'}}>
-                        <button 
-                          className={`btn btn-sm ${customer.aiEnabled ? 'btn-primary' : 'btn-outline'}`}
-                          onClick={(e) => toggleCustomerAI(customer.id, e)}
-                        >
-                          <i className="fas fa-robot"></i> AI {customer.aiEnabled ? 'On' : 'Off'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Customer Analysis */}
-            <div className="card">
-              <div className="card-header">
-                <h3><i className="fas fa-chart-pie"></i> Customer Analysis</h3>
-              </div>
-              <div className="card-content">
-                {currentCustomer && (
-                  <div>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px'}}>
-                      <div style={{
-                        width: '60px', 
-                        height: '60px', 
-                        backgroundColor: '#2d3748', 
-                        borderRadius: '50%', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        color: 'white', 
-                        fontSize: '1.5rem'
-                      }}>
-                        <span>{currentCustomer.name.charAt(0)}</span>
-                      </div>
-                      <div>
-                        <h2>{currentCustomer.name}</h2>
-                        <p style={{color: '#718096'}}>{currentCustomer.phone}</p>
-                      </div>
-                    </div>
-
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px'}}>
-                      <div className="info-card">
-                        <h4><i className="fas fa-map-marker-alt"></i> Location</h4>
-                        <p>{currentCustomer.location}</p>
-                      </div>
-                      <div className="info-card">
-                        <h4><i className="fas fa-shopping-cart"></i> Needs</h4>
-                        <p>{currentCustomer.needs}</p>
-                      </div>
-                      <div className="info-card">
-                        <h4><i className="fas fa-comments"></i> Conversation Status</h4>
-                        <p>{currentCustomer.status}</p>
-                      </div>
-                      <div className="info-card">
-                        <h4><i className="fas fa-star"></i> Sentiment</h4>
-                        <p>
-                          {currentCustomer.sentiment} 
-                          <span style={{color: currentCustomer.sentiment === 'positive' ? '#2e7d32' : currentCustomer.sentiment === 'negative' ? '#e53e3e' : '#d97706'}}>
-                            {currentCustomer.sentiment === 'positive' ? ' 😊' : currentCustomer.sentiment === 'negative' ? ' 😞' : ' 😐'}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="card" style={{marginBottom: '20px'}}>
-                      <div className="card-header">
-                        <h3><i className="fas fa-history"></i> Interaction History</h3>
-                      </div>
-                      <div className="card-content">
-                        {currentCustomer.interactions.map((interaction, index) => (
-                          <div key={index} className="interaction-item">
-                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
-                              <strong>{interaction.date}</strong>
-                              <span className={`badge badge-${interaction.status === 'Completed' ? 'success' : interaction.status === 'Pending' ? 'warning' : 'secondary'}`}>
-                                {interaction.status}
-                              </span>
-                            </div>
-                            <p>{interaction.note}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="card">
-                      <div className="card-header">
-                        <h3><i className="fas fa-lightbulb"></i> Recommended Action</h3>
-                      </div>
-                      <div className="card-content">
-                        <p>{currentCustomer.action}</p>
-                        <button className="btn btn-primary" style={{marginTop: '10px'}}>
-                          <i className="fas fa-paper-plane"></i> Send Message
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div className="bot-tab-content" style={{padding: '10px'}}>
+        <div className="bot-tab-content" style={{padding: '20px'}}>
           <div className="card">
             <div className="card-header">
-              <h3><i className="fas fa-cog"></i> Bot Configuration</h3>
+              <h3><i className="fas fa-info-circle"></i> Informasi Bot</h3>
             </div>
             <div className="card-content">
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
                 <div>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Bot Name</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={botSettings.name}
-                    onChange={(e) => setBotSettings({...botSettings, name: e.target.value})}
-                  />
+                  <h4>Nama Bot</h4>
+                  <p>{currentBot.name}</p>
                 </div>
                 <div>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Phone Number</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={botSettings.number}
-                    onChange={(e) => setBotSettings({...botSettings, number: e.target.value})}
-                  />
+                  <h4>Status</h4>
+                  <p>
+                    <span className={`badge badge-${currentBot.isRunning ? 'success' : 'secondary'}`}>
+                      {currentBot.isRunning ? 'Berjalan' : 'Berhenti'}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <h4>Nomor yang Diizinkan</h4>
+                  <p>{currentBot.config?.allowedNumbers?.join(', ') || 'Tidak ada'}</p>
+                </div>
+                <div>
+                  <h4>Google Sheets</h4>
+                  <p>
+                    <span className={`badge badge-${currentBot.hasSheetsConfig ? 'success' : 'secondary'}`}>
+                      {currentBot.hasSheetsConfig ? 'Dikonfigurasi' : 'Belum dikonfigurasi'}
+                    </span>
+                  </p>
                 </div>
               </div>
               
-              <div style={{marginBottom: '15px'}}>
-                <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Description</label>
+              <div style={{marginTop: '20px'}}>
+                <h4>Deskripsi</h4>
+                <p>{currentBot.config?.description || 'Tidak ada deskripsi'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* AI Prompt Tab */}
+      {activeTab === 'prompt' && (
+        <div className="bot-tab-content" style={{padding: '20px'}}>
+          <div className="card">
+            <div className="card-header">
+              <h3><i className="fas fa-comment-alt"></i> Konfigurasi AI Prompt</h3>
+            </div>
+            <div className="card-content">
+              <div className="prompt-editor">
+                <label htmlFor="ai-prompt" style={{display: 'block', marginBottom: '10px', fontWeight: '500'}}>
+                  Instruksi untuk asisten AI:
+                </label>
                 <textarea 
-                  className="form-control" 
-                  style={{width: '100%', minHeight: '100px'}}
-                  value={botSettings.description}
-                  onChange={(e) => setBotSettings({...botSettings, description: e.target.value})}
+                  id="ai-prompt" 
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  rows="10"
+                  style={{
+                    width: '100%', 
+                    padding: '15px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace'
+                  }}
+                  placeholder="Masukkan instruksi untuk AI di sini..."
                 />
               </div>
               
-              <div style={{marginBottom: '15px'}}>
-                <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Timezone</label>
-                <select 
-                  className="form-control"
-                  value={botSettings.timezone}
-                  onChange={(e) => setBotSettings({...botSettings, timezone: e.target.value})}
-                >
-                  <option value="GMT+7">GMT+7 (Jakarta)</option>
-                  <option value="GMT+8">GMT+8 (Singapore)</option>
-                  <option value="GMT+0">GMT+0 (London)</option>
-                </select>
-              </div>
-              
-              <div style={{marginBottom: '15px'}}>
-                <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Bot Avatar</label>
-                <input type="file" className="form-control" />
-              </div>
-
-              <div style={{marginTop: '25px', borderTop: '1px solid #e2e8f0', paddingTop: '20px'}}>
-                <h3 style={{marginBottom: '15px'}}><i className="fab fa-google"></i> Google Sheets Integration</h3>
-                
-                <div style={{marginBottom: '15px'}}>
-                  <label style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px'}}>
-                    <input 
-                      type="checkbox" 
-                      checked={botSettings.enableSheets}
-                      onChange={(e) => setBotSettings({...botSettings, enableSheets: e.target.checked})}
-                    /> 
-                    Enable Google Sheets Integration
-                  </label>
-                </div>
-          
-                {botSettings.enableSheets && (
-                  <div style={{marginBottom: '15px'}}>
-                    <div style={{marginBottom: '15px'}}>
-                      <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Google Sheets URL</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="https://docs.google.com/spreadsheets/d/..." 
-                        value={botSettings.sheetsUrl}
-                        onChange={(e) => setBotSettings({...botSettings, sheetsUrl: e.target.value})}
-                      />
-                    </div>
-                    
-                    <div style={{marginBottom: '15px'}}>
-                      <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Sheet Name/Tab</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="e.g., Customer Data" 
-                        value={botSettings.sheetsTab}
-                        onChange={(e) => setBotSettings({...botSettings, sheetsTab: e.target.value})}
-                      />
-                    </div>
-                    
-                    <div style={{marginBottom: '15px'}}>
-                      <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>Data Range</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="e.g., A1:E1000" 
-                        value={botSettings.sheetsRange}
-                        onChange={(e) => setBotSettings({...botSettings, sheetsRange: e.target.value})}
-                      />
-                    </div>
-                    
-                    <button className="btn btn-primary" style={{marginTop: '10px'}}>
-                      <i className="fas fa-sync-alt"></i> Test Connection
-                    </button>
-                    
-                    <button className="btn btn-secondary" style={{marginTop: '10px', marginLeft: '10px'}}>
-                      <i className="fas fa-key"></i> Re-authenticate
-                    </button>
-                  </div>
-                )}
-              </div>
-                  
-              <button className="btn btn-primary">
-                <i className="fas fa-save"></i> Save Settings
+              <button 
+                className="btn btn-primary" 
+                style={{marginTop: '15px'}}
+                onClick={savePrompt}
+                disabled={isSavingPrompt}
+              >
+                <i className="fas fa-save"></i> 
+                {isSavingPrompt ? ' Menyimpan...' : ' Simpan Prompt'}
               </button>
-            </div>
-          </div>
-          
-          <div className="card">
-            <div className="card-header">
-              <h3><i className="fas fa-exclamation-triangle" style={{color: '#e53e3e'}}></i> Danger Zone</h3>
-            </div>
-            <div className="card-content">
-              <div style={{background: '#fff5f5', border: '1px solid #fed7d7', padding: '15px', borderRadius: '6px'}}>
-                <h4 style={{color: '#e53e3e', marginBottom: '10px'}}>Delete This Bot</h4>
-                <p style={{marginBottom: '15px', color: '#718096'}}>This action cannot be undone. All bot data will be permanently deleted.</p>
-                <button className="btn btn-danger">
-                  <i className="fas fa-trash"></i> Delete Bot
-                </button>
-              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Analysis Tab */}
+      {activeTab === 'analysis' && (
+        <div className="bot-tab-content" style={{padding: '20px'}}>
+          <div style={{display: 'grid', gridTemplateColumns: selectedReport ? '1fr 1fr' : '1fr', gap: '20px'}}>
+            <div className="card">
+              <div className="card-header">
+                <h3><i className="fas fa-chart-bar"></i> Analisis Chat History</h3>
+                <button 
+                  className="btn btn-primary"
+                  onClick={startAnalysis}
+                  disabled={isAnalyzing}
+                >
+                  <i className="fas fa-sync-alt"></i>
+                  {isAnalyzing ? ' Menganalisis...' : ' Mulai Analisis'}
+                </button>
+              </div>
+              <div className="card-content">
+                <p>Total laporan: {analysisResults.length}</p>
+                
+                <div style={{marginTop: '15px'}}>
+                  {analysisResults.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center', 
+                      padding: '40px', 
+                      color: '#666',
+                      background: '#f8f9fa',
+                      borderRadius: '6px'
+                    }}>
+                      <i className="fas fa-inbox" style={{fontSize: '2rem', marginBottom: '10px'}}></i>
+                      <p>Belum ada hasil analisis</p>
+                      <p>Klik "Mulai Analisis" untuk menganalisis chat history</p>
+                    </div>
+                  ) : (
+                    <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                      {analysisResults.map((report, index) => (
+                        <div 
+                          key={index}
+                          className="customer-item"
+                          onClick={() => viewReport(report.phoneNumber)}
+                          style={{cursor: 'pointer', marginBottom: '10px'}}
+                        >
+                          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <div>
+                              <h4>{report.phoneNumber}</h4>
+                              <p style={{fontSize: '0.9rem', color: '#666'}}>
+                                Dibuat: {formatDate(report.createdAt)}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="badge badge-primary">
+                                {(report.size / 1024).toFixed(1)} KB
+                              </span>
+                            </div>
+                          </div>
+                          <p style={{marginTop: '8px', fontSize: '0.9rem'}}>
+                            {report.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Report Detail */}
+            {selectedReport && (
+              <div className="card">
+                <div className="card-header">
+                  <h3><i className="fas fa-file-alt"></i> Detail Laporan</h3>
+                  <button 
+                    className="btn btn-outline"
+                    onClick={() => setSelectedReport(null)}
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+                <div className="card-content">
+                  <div style={{marginBottom: '15px'}}>
+                    <h4>Nomor: {selectedReport.phoneNumber}</h4>
+                    <p style={{color: '#666'}}>
+                      Dibuat: {formatDate(selectedReport.createdAt)}
+                    </p>
+                  </div>
+                  
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '15px',
+                    borderRadius: '6px',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.5'
+                  }}>
+                    {selectedReport.content}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Google Sheets Tab */}
+      {activeTab === 'sheets' && (
+        <div className="bot-tab-content" style={{padding: '20px'}}>
+          <div className="card">
+            <div className="card-header">
+              <h3><i className="fab fa-google"></i> Konfigurasi Google Sheets</h3>
+            </div>
+            <div className="card-content">
+              <div style={{marginBottom: '20px'}}>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                  Spreadsheet ID
+                </label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" 
+                  value={sheetsConfig.spreadsheetId}
+                  onChange={(e) => setSheetsConfig({...sheetsConfig, spreadsheetId: e.target.value})}
+                />
+                <small style={{color: '#666'}}>
+                  Ambil dari URL Google Sheets: https://docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit
+                </small>
+              </div>
+              
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px'}}>
+                <div>
+                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                    Nama Sheet
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    value={sheetsConfig.sheetName}
+                    onChange={(e) => setSheetsConfig({...sheetsConfig, sheetName: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                    Credentials Path
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    value={sheetsConfig.credentialsPath}
+                    onChange={(e) => setSheetsConfig({...sheetsConfig, credentialsPath: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div style={{display: 'flex', gap: '10px', marginBottom: '20px'}}>
+                <button 
+                  className="btn btn-primary"
+                  onClick={saveSheetsConfig}
+                  disabled={loading}
+                >
+                  <i className="fas fa-save"></i>
+                  {loading ? ' Menyimpan...' : ' Simpan Konfigurasi'}
+                </button>
+                
+                <button 
+                  className="btn btn-success"
+                  onClick={uploadToSheets}
+                  disabled={isUploadingSheets || !sheetsConfig.spreadsheetId}
+                >
+                  <i className="fas fa-upload"></i>
+                  {isUploadingSheets ? ' Mengupload...' : ' Upload ke Sheets'}
+                </button>
+              </div>
+
+              {sheetsConfig.configured && sheetsConfig.spreadsheetId && (
+                <div style={{
+                  background: '#d4edda',
+                  border: '1px solid #c3e6cb',
+                  color: '#155724',
+                  padding: '10px',
+                  borderRadius: '6px'
+                }}>
+                  <i className="fas fa-check-circle"></i> Google Sheets telah dikonfigurasi
+                  <br />
+                  <a 
+                    href={`https://docs.google.com/spreadsheets/d/${sheetsConfig.spreadsheetId}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{color: '#155724'}}
+                  >
+                    <i className="fas fa-external-link-alt"></i> Buka Spreadsheet
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3><i className="fas fa-info-circle"></i> Cara Penggunaan</h3>
+            </div>
+            <div className="card-content">
+              <ol style={{paddingLeft: '20px'}}>
+                <li>Buat Google Spreadsheet baru atau gunakan yang sudah ada</li>
+                <li>Copy Spreadsheet ID dari URL</li>
+                <li>Pastikan file credentials JSON ada di path yang benar</li>
+                <li>Klik "Simpan Konfigurasi"</li>
+                <li>Jalankan analisis chat terlebih dahulu</li>
+                <li>Klik "Upload ke Sheets" untuk mengirim hasil analisis</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .bot-tabs {
+          display: flex;
+          border-bottom: 2px solid #e2e8f0;
+          margin-bottom: 20px;
+        }
+
+        .bot-tab {
+          padding: 12px 20px;
+          cursor: pointer;
+          border-bottom: 3px solid transparent;
+          transition: all 0.3s ease;
+          font-weight: 500;
+        }
+
+        .bot-tab:hover {
+          background-color: #f8f9fa;
+        }
+
+        .bot-tab.active {
+          border-bottom-color: #3182ce;
+          color: #3182ce;
+          background-color: #ebf8ff;
+        }
+
+        .customer-item {
+          background: #f8f9fa;
+          padding: 15px;
+          border-radius: 6px;
+          border: 1px solid #e2e8f0;
+          transition: all 0.2s ease;
+        }
+
+        .customer-item:hover {
+          background: #e2e8f0;
+          border-color: #cbd5e0;
+        }
+
+        .badge {
+          display: inline-block;
+          padding: 4px 8px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          line-height: 1;
+          text-align: center;
+          white-space: nowrap;
+          vertical-align: baseline;
+          border-radius: 0.375rem;
+        }
+
+        .badge-success {
+          color: #fff;
+          background-color: #38a169;
+        }
+
+        .badge-secondary {
+          color: #fff;
+          background-color: #718096;
+        }
+
+        .badge-primary {
+          color: #fff;
+          background-color: #3182ce;
+        }
+      `}</style>
     </div>
   );
 }

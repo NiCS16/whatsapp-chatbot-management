@@ -17,8 +17,21 @@ export default function BotManagement({ onManageBot }) {
   const [error, setError] = useState(null);
   const [qrPollInterval, setQrPollInterval] = useState(null);
   const [runningBots, setRunningBots] = useState(new Set());
+  const [lastQrHash, setLastQrHash] = useState(null); // Track QR changes
 
   const API_BASE = "http://localhost:3001";
+
+  // Generate simple hash for QR data to detect changes
+  const generateQrHash = (qrString) => {
+    if (!qrString) return null;
+    let hash = 0;
+    for (let i = 0; i < qrString.length; i++) {
+      const char = qrString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return hash.toString();
+  };
 
   // Fetch bots from backend
   const fetchBots = async () => {
@@ -49,6 +62,58 @@ export default function BotManagement({ onManageBot }) {
     }
   };
 
+  // Enhanced QR polling with change detection
+  const pollQrCode = async (botName) => {
+    try {
+      const qrResponse = await fetch(`${API_BASE}/bots/${botName}/qr?t=${Date.now()}`);
+      
+      if (qrResponse.ok) {
+        const qrResponseData = await qrResponse.json();
+        
+        // Generate hash for current QR data
+        const currentQrHash = generateQrHash(qrResponseData.qr);
+        
+        // Only update if QR data actually changed or status changed
+        if (currentQrHash !== lastQrHash || qrResponseData.status !== qrData.status) {
+          console.log('QR Code updated:', {
+            oldHash: lastQrHash,
+            newHash: currentQrHash,
+            status: qrResponseData.status
+          });
+          
+          setQrData(qrResponseData);
+          setLastQrHash(currentQrHash);
+        }
+
+        // Check if authentication completed
+        if (['authenticated', 'ready'].includes(qrResponseData.status)) {
+          if (qrPollInterval) {
+            clearInterval(qrPollInterval);
+            setQrPollInterval(null);
+          }
+          
+          await fetchBots();
+          await fetchRunningBots();
+
+          setTimeout(() => {
+            setShowQRModal(false);
+            setLastQrHash(null);
+          }, 3000);
+          
+          return true; // Signal completion
+        }
+      } else if (qrResponse.status === 404) {
+        // QR not available yet
+        setQrData(prev => ({ ...prev, status: 'waiting' }));
+      }
+    } catch (err) {
+      console.error('Error polling QR:', err);
+      setQrData(prev => ({ ...prev, status: 'error' }));
+    }
+    
+    return false; // Continue polling
+  };
+
   useEffect(() => {
     fetchBots();
     fetchRunningBots();
@@ -56,7 +121,7 @@ export default function BotManagement({ onManageBot }) {
     // Set up periodic refresh for running status
     const refreshInterval = setInterval(() => {
       fetchRunningBots();
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
     // Clean up intervals on unmount
     return () => {
@@ -70,7 +135,6 @@ export default function BotManagement({ onManageBot }) {
     const isRunning = runningBots.has(bot.name);
 
     if (isRunning) {
-      // Bot is running - show runtime status or default to "Running"
       return {
         text: bot.runtimeStatus || 'Running',
         className: 'status-running',
@@ -78,7 +142,6 @@ export default function BotManagement({ onManageBot }) {
       };
     }
 
-    // Bot is not running - show WhatsApp session status
     switch (bot.status) {
       case 'Ready':
         return {
@@ -112,7 +175,6 @@ export default function BotManagement({ onManageBot }) {
     const isRunning = runningBots.has(bot.name);
 
     if (isRunning) {
-      // Bot is running
       return [
         {
           type: 'manage',
@@ -138,12 +200,8 @@ export default function BotManagement({ onManageBot }) {
       ];
     }
 
-
-
-    // Bot is not running
     const actions = [];
 
-    // Add start/login button if bot can be started
     if (bot.status !== 'Not Configured') {
       actions.push({
         type: 'start',
@@ -154,7 +212,6 @@ export default function BotManagement({ onManageBot }) {
       });
     }
 
-    // Always allow delete
     actions.push({
       type: 'delete',
       label: 'Delete',
@@ -162,13 +219,13 @@ export default function BotManagement({ onManageBot }) {
       className: 'btn-danger',
       onClick: () => deleteBot(bot.name)
     },
-      {
-        type: 'manage',
-        label: 'Manage',
-        icon: 'fa-cog',
-        className: 'btn-secondary',
-        onClick: () => manageBot(bot)
-      });
+    {
+      type: 'manage',
+      label: 'Manage',
+      icon: 'fa-cog',
+      className: 'btn-secondary',
+      onClick: () => manageBot(bot)
+    });
 
     return actions;
   };
@@ -236,18 +293,19 @@ export default function BotManagement({ onManageBot }) {
       }
 
       await fetchBots();
-      await fetchRunningBots(); // Update running status
+      await fetchRunningBots();
     } catch (err) {
       setError(err.message);
     }
   };
 
-  // Login/Start bot (show QR modal if needed)
+  // Login/Start bot with enhanced QR polling
   const loginBot = async (bot) => {
     setSelectedBot(bot);
     setQrData({ qr: null, status: 'starting' });
     setShowQRModal(true);
     setError(null);
+    setLastQrHash(null);
 
     try {
       // Start the bot
@@ -260,53 +318,43 @@ export default function BotManagement({ onManageBot }) {
         throw new Error(errorData.error || 'Failed to start bot');
       }
 
-      // Update running status immediately
       await fetchRunningBots();
 
-      // If bot was already authenticated (status 'Ready'), it might not need QR
+      // If bot was already authenticated
       if (bot.status === 'Ready') {
         setQrData({ qr: null, status: 'authenticated' });
         setTimeout(() => {
           setShowQRModal(false);
-          fetchBots(); // Refresh to show new status
+          fetchBots();
         }, 2000);
         return;
       }
 
-      // Poll for QR code status for unauthenticated bots
+      // Enhanced polling with more aggressive refresh
+      let pollAttempts = 0;
+      const maxAttempts = 60; // 2 minutes at 2-second intervals
+      
       const interval = setInterval(async () => {
-        try {
-          const qrResponse = await fetch(`${API_BASE}/bots/${bot.name}/qr`);
-          if (qrResponse.ok) {
-            const qrResponseData = await qrResponse.json();
-            setQrData(qrResponseData);
-
-            if (['authenticated', 'ready'].includes(qrResponseData.status)) {
-              clearInterval(interval);
-              await fetchBots(); // Refresh bot status
-              await fetchRunningBots(); // Update running status
-
-              // Auto-close modal after 3 seconds
-              setTimeout(() => {
-                setShowQRModal(false);
-              }, 3000);
-            }
-          }
-        } catch (err) {
-          console.error('Error polling QR:', err);
+        pollAttempts++;
+        
+        const isComplete = await pollQrCode(bot.name);
+        
+        if (isComplete) {
+          clearInterval(interval);
+          setQrPollInterval(null);
+          return;
         }
-      }, 2000);
-
-      setQrPollInterval(interval);
-
-      // Stop polling after 2 minutes
-      setTimeout(() => {
-        clearInterval(interval);
-        if (!['authenticated', 'ready'].includes(qrData.status)) {
+        
+        if (pollAttempts >= maxAttempts) {
+          clearInterval(interval);
+          setQrPollInterval(null);
           setError('QR code timeout. Please try again.');
           setShowQRModal(false);
         }
-      }, 120000);
+      }, 2000); // Poll every 2 seconds
+
+      setQrPollInterval(interval);
+
     } catch (err) {
       setError(err.message);
       setShowQRModal(false);
@@ -326,17 +374,19 @@ export default function BotManagement({ onManageBot }) {
       }
 
       await fetchBots();
-      await fetchRunningBots(); // Update running status
+      await fetchRunningBots();
     } catch (err) {
       setError(err.message);
     }
   };
 
-  // Close QR modal
+  // Close QR modal with cleanup
   const closeQRModal = () => {
     setShowQRModal(false);
     setSelectedBot(null);
     setQrData({ qr: null, status: 'unknown' });
+    setLastQrHash(null);
+    
     if (qrPollInterval) {
       clearInterval(qrPollInterval);
       setQrPollInterval(null);
@@ -348,6 +398,17 @@ export default function BotManagement({ onManageBot }) {
     if (onManageBot) {
       onManageBot(bot);
     }
+  };
+
+  // Manual refresh QR code
+  const refreshQrCode = async () => {
+    if (!selectedBot) return;
+    
+    setQrData(prev => ({ ...prev, status: 'refreshing' }));
+    setLastQrHash(null);
+    
+    // Force refresh by calling the API immediately
+    await pollQrCode(selectedBot.name);
   };
 
   // Filter bots based on search term
@@ -521,7 +582,7 @@ export default function BotManagement({ onManageBot }) {
         </div>
       )}
 
-      {/* QR Login Modal */}
+      {/* Enhanced QR Login Modal */}
       {showQRModal && selectedBot && (
         <div className="modal" style={{ display: 'flex' }}>
           <div className="modal-content">
@@ -529,9 +590,21 @@ export default function BotManagement({ onManageBot }) {
               <h3>
                 {qrData.status === 'starting' ? 'Starting Bot' : 'WhatsApp Login'} - {selectedBot.name}
               </h3>
-              <button className="close-btn" onClick={closeQRModal}>
-                <i className="fas fa-times"></i>
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {qrData.qr && (
+                  <button 
+                    className="btn btn-sm btn-secondary" 
+                    onClick={refreshQrCode}
+                    title="Refresh QR Code"
+                    disabled={qrData.status === 'refreshing'}
+                  >
+                    <i className={`fas fa-sync-alt ${qrData.status === 'refreshing' ? 'fa-spin' : ''}`}></i>
+                  </button>
+                )}
+                <button className="close-btn" onClick={closeQRModal}>
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
             </div>
             <div className="modal-body" style={{ textAlign: 'center', padding: '2rem' }}>
               <div className="qr-placeholder" style={{
@@ -543,25 +616,48 @@ export default function BotManagement({ onManageBot }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '14px',
-                color: '#666'
+                color: '#666',
+                position: 'relative'
               }}>
                 {qrData.qr ? (
-                  qrData.qr.startsWith("data:image") ? (
-                    // Kalau backend sudah kasih base64 image
-                    <img src={qrData.qr} alt="QR Code" style={{ width: '100%', height: '100%' }} />
-                  ) : (
-                    // Kalau backend cuma kasih string QR
-                    <QRCodeCanvas value={qrData.qr} size={200} />
-                  )
+                  <>
+                    {qrData.qr.startsWith("data:image") ? (
+                      <img 
+                        src={qrData.qr} 
+                        alt="QR Code" 
+                        style={{ width: '100%', height: '100%' }}
+                        key={lastQrHash} // Force re-render when QR changes
+                      />
+                    ) : (
+                      <QRCodeCanvas 
+                        value={qrData.qr} 
+                        size={200} 
+                        key={lastQrHash} // Force re-render when QR changes
+                      />
+                    )}
+                    {/* Auto-refresh indicator */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '5px',
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#4CAF50',
+                      animation: 'pulse 2s infinite'
+                    }} title="Auto-refreshing QR code"></div>
+                  </>
                 ) : qrData.status === 'starting' ? (
                   <div>
                     <i className="fas fa-spinner fa-spin fa-2x"></i>
                     <div style={{ marginTop: '10px' }}>Starting bot...</div>
                   </div>
-                ) : qrData.status === 'waiting' ? (
+                ) : qrData.status === 'waiting' || qrData.status === 'refreshing' ? (
                   <div>
-                    <i className="fas fa-qrcode fa-2x"></i>
-                    <div style={{ marginTop: '10px' }}>Generating QR Code...</div>
+                    <i className={`fas fa-qrcode fa-2x ${qrData.status === 'refreshing' ? 'fa-pulse' : ''}`}></i>
+                    <div style={{ marginTop: '10px' }}>
+                      {qrData.status === 'refreshing' ? 'Refreshing QR Code...' : 'Generating QR Code...'}
+                    </div>
                   </div>
                 ) : qrData.status === 'authenticated' ? (
                   <div>
@@ -569,31 +665,68 @@ export default function BotManagement({ onManageBot }) {
                     <div style={{ marginTop: '10px', color: 'green' }}>Bot Started!</div>
                   </div>
                 ) : (
-                  'No QR Code Available'
+                  <div>
+                    <i className="fas fa-exclamation-triangle fa-2x" style={{ color: 'orange' }}></i>
+                    <div style={{ marginTop: '10px' }}>QR Code not available</div>
+                  </div>
                 )}
-
               </div>
+              
               <div className={`connection-status ${['authenticated', 'ready'].includes(qrData.status) ? 'connected' : 'disconnected'}`}>
-                <i className={`fas ${['authenticated', 'ready'].includes(qrData.status) ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                <i className={`fas ${['authenticated', 'ready'].includes(qrData.status) ? 'fa-check-circle' : 'fa-clock'}`}></i>
                 {qrData.status === 'starting' ? ' Starting bot...' :
                   ['authenticated', 'ready'].includes(qrData.status) ? ' Connected!' :
                     qrData.status === 'waiting' ? ' Waiting for QR code...' :
-                      ' Waiting for connection...'}
+                      qrData.status === 'refreshing' ? ' Refreshing QR code...' :
+                        ' Waiting for connection...'}
               </div>
+              
               {qrData.qr && (
-                <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
-                  Scan the QR code with WhatsApp on your phone
-                </p>
+                <div style={{ marginTop: '1rem' }}>
+                  <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
+                    Scan the QR code with WhatsApp on your phone
+                  </p>
+                  <p style={{ fontSize: '0.8rem', color: '#999' }}>
+                    QR code auto-refreshes every 2 seconds
+                  </p>
+                </div>
               )}
+              
               {['authenticated', 'ready'].includes(qrData.status) && (
                 <p style={{ color: 'green', fontWeight: 'bold' }}>
                   Bot started successfully! This window will close automatically.
                 </p>
               )}
+              
+              {qrData.status === 'error' && (
+                <div style={{ color: 'red', marginTop: '1rem' }}>
+                  <i className="fas fa-exclamation-circle"></i> Error loading QR code
+                  <br />
+                  <button 
+                    className="btn btn-sm btn-primary" 
+                    onClick={refreshQrCode}
+                    style={{ marginTop: '10px' }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
+      
+      <style jsx>{`
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+        
+        .fa-pulse {
+          animation: pulse 1s infinite;
+        }
+      `}</style>
     </div>
   );
 }
