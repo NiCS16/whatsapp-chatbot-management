@@ -4,16 +4,16 @@ export default function BotDashboard({ bot, onBack }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [currentBot, setCurrentBot] = useState(bot);
   const [loading, setLoading] = useState(false);
-  
+
   // Prompt states
   const [aiPrompt, setAiPrompt] = useState("");
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
-  
+
   // Analysis states
   const [analysisResults, setAnalysisResults] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
-  
+
   // Google Sheets states
   const [sheetsConfig, setSheetsConfig] = useState({
     spreadsheetId: '',
@@ -22,7 +22,7 @@ export default function BotDashboard({ bot, onBack }) {
     configured: false
   });
   const [isUploadingSheets, setIsUploadingSheets] = useState(false);
-  
+
   const API_BASE = 'http://localhost:3001';
 
   useEffect(() => {
@@ -32,9 +32,10 @@ export default function BotDashboard({ bot, onBack }) {
     }
   }, [bot]);
 
+
   const fetchBotData = async () => {
     if (!currentBot?.name) return;
-    
+
     try {
       // Fetch prompt
       await fetchPrompt();
@@ -73,7 +74,7 @@ export default function BotDashboard({ bot, onBack }) {
         },
         body: JSON.stringify({ prompt: aiPrompt }),
       });
-      
+
       if (response.ok) {
         alert('Prompt berhasil disimpan!');
       } else {
@@ -109,7 +110,7 @@ export default function BotDashboard({ bot, onBack }) {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         alert(`Analisis selesai! Diproses ${data.result.processed} file baru.`);
@@ -163,7 +164,7 @@ export default function BotDashboard({ bot, onBack }) {
         },
         body: JSON.stringify(sheetsConfig),
       });
-      
+
       if (response.ok) {
         alert('Konfigurasi Google Sheets berhasil disimpan!');
         await fetchSheetsConfig();
@@ -193,7 +194,7 @@ export default function BotDashboard({ bot, onBack }) {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         alert(`Upload berhasil! Data telah disimpan ke Google Sheets.`);
@@ -215,8 +216,49 @@ export default function BotDashboard({ bot, onBack }) {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID') + ' ' + date.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+    return date.toLocaleDateString('id-ID') + ' ' + date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Tambahkan function baru
+const reanalyzeReport = async (phoneNumber) => {
+  if (!currentBot?.name) return;
+  setIsAnalyzing(true);
+  try {
+    const response = await fetch(`${API_BASE}/api/analyze-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        botName: currentBot.name,
+        phoneNumber,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      alert(`Re-analyze selesai untuk nomor ${phoneNumber}`);
+
+      // refresh daftar hasil analisis
+      await fetchAnalysisResults();
+
+      // kalau lagi buka detail report, ambil ulang isinya
+      if (selectedReport?.phoneNumber === phoneNumber) {
+        await viewReport(phoneNumber);
+      }
+    } else {
+      const errorData = await response.json();
+      alert(`Gagal re-analyze: ${errorData.error}`);
+    }
+  } catch (error) {
+    console.error('Error reanalyzing report:', error);
+    alert('Terjadi kesalahan saat re-analyze');
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
+
+
 
   if (!currentBot) {
     return (
@@ -232,7 +274,7 @@ export default function BotDashboard({ bot, onBack }) {
   }
 
   return (
-    <div className="page active">    
+    <div className="page active">
       <div className="page-header">
         <h1 className="page-title">
           <i className="fas fa-robot"></i> {currentBot.name} Dashboard
@@ -241,43 +283,43 @@ export default function BotDashboard({ bot, onBack }) {
           <i className="fas fa-arrow-left"></i> Kembali ke Bot Management
         </button>
       </div>
-      
+
       <div className="bot-tabs">
-        <div 
-          className={`bot-tab ${activeTab === 'overview' ? 'active' : ''}`} 
+        <div
+          className={`bot-tab ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
           Overview
         </div>
-        <div 
-          className={`bot-tab ${activeTab === 'prompt' ? 'active' : ''}`} 
+        <div
+          className={`bot-tab ${activeTab === 'prompt' ? 'active' : ''}`}
           onClick={() => setActiveTab('prompt')}
         >
           AI Prompt
         </div>
-        <div 
-          className={`bot-tab ${activeTab === 'analysis' ? 'active' : ''}`} 
+        <div
+          className={`bot-tab ${activeTab === 'analysis' ? 'active' : ''}`}
           onClick={() => setActiveTab('analysis')}
         >
           Analisis Chat
         </div>
-        <div 
-          className={`bot-tab ${activeTab === 'sheets' ? 'active' : ''}`} 
+        <div
+          className={`bot-tab ${activeTab === 'sheets' ? 'active' : ''}`}
           onClick={() => setActiveTab('sheets')}
         >
           Google Sheets
         </div>
       </div>
-      
+
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="bot-tab-content" style={{padding: '20px'}}>
+        <div className="bot-tab-content" style={{ padding: '20px' }}>
           <div className="card">
             <div className="card-header">
               <h3><i className="fas fa-info-circle"></i> Informasi Bot</h3>
             </div>
             <div className="card-content">
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
                   <h4>Nama Bot</h4>
                   <p>{currentBot.name}</p>
@@ -291,7 +333,7 @@ export default function BotDashboard({ bot, onBack }) {
                   </p>
                 </div>
                 <div>
-                  <h4>Nomor yang Diizinkan</h4>
+                  <h4>Nomor Yang Login</h4>
                   <p>{currentBot.config?.allowedNumbers?.join(', ') || 'Tidak ada'}</p>
                 </div>
                 <div>
@@ -303,8 +345,8 @@ export default function BotDashboard({ bot, onBack }) {
                   </p>
                 </div>
               </div>
-              
-              <div style={{marginTop: '20px'}}>
+
+              <div style={{ marginTop: '20px' }}>
                 <h4>Deskripsi</h4>
                 <p>{currentBot.config?.description || 'Tidak ada deskripsi'}</p>
               </div>
@@ -312,26 +354,26 @@ export default function BotDashboard({ bot, onBack }) {
           </div>
         </div>
       )}
-      
+
       {/* AI Prompt Tab */}
       {activeTab === 'prompt' && (
-        <div className="bot-tab-content" style={{padding: '20px'}}>
+        <div className="bot-tab-content" style={{ padding: '20px' }}>
           <div className="card">
             <div className="card-header">
               <h3><i className="fas fa-comment-alt"></i> Konfigurasi AI Prompt</h3>
             </div>
             <div className="card-content">
               <div className="prompt-editor">
-                <label htmlFor="ai-prompt" style={{display: 'block', marginBottom: '10px', fontWeight: '500'}}>
+                <label htmlFor="ai-prompt" style={{ display: 'block', marginBottom: '10px', fontWeight: '500' }}>
                   Instruksi untuk asisten AI:
                 </label>
-                <textarea 
-                  id="ai-prompt" 
+                <textarea
+                  id="ai-prompt"
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   rows="10"
                   style={{
-                    width: '100%', 
+                    width: '100%',
                     padding: '15px',
                     border: '1px solid #ddd',
                     borderRadius: '6px',
@@ -341,14 +383,14 @@ export default function BotDashboard({ bot, onBack }) {
                   placeholder="Masukkan instruksi untuk AI di sini..."
                 />
               </div>
-              
-              <button 
-                className="btn btn-primary" 
-                style={{marginTop: '15px'}}
+
+              <button
+                className="btn btn-primary"
+                style={{ marginTop: '15px' }}
                 onClick={savePrompt}
                 disabled={isSavingPrompt}
               >
-                <i className="fas fa-save"></i> 
+                <i className="fas fa-save"></i>
                 {isSavingPrompt ? ' Menyimpan...' : ' Simpan Prompt'}
               </button>
             </div>
@@ -358,12 +400,12 @@ export default function BotDashboard({ bot, onBack }) {
 
       {/* Analysis Tab */}
       {activeTab === 'analysis' && (
-        <div className="bot-tab-content" style={{padding: '20px'}}>
-          <div style={{display: 'grid', gridTemplateColumns: selectedReport ? '1fr 1fr' : '1fr', gap: '20px'}}>
-            <div className="card">
+        <div className="bot-tab-content" style={{ padding: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: selectedReport ? '1fr 1fr' : '1fr', gap: '20px' }}>
+            <div clas      sName="card">
               <div className="card-header">
                 <h3><i className="fas fa-chart-bar"></i> Analisis Chat History</h3>
-                <button 
+                <button
                   className="btn btn-primary"
                   onClick={startAnalysis}
                   disabled={isAnalyzing}
@@ -374,46 +416,53 @@ export default function BotDashboard({ bot, onBack }) {
               </div>
               <div className="card-content">
                 <p>Total laporan: {analysisResults.length}</p>
-                
-                <div style={{marginTop: '15px'}}>
+
+                <div style={{ marginTop: '15px' }}>
                   {analysisResults.length === 0 ? (
                     <div style={{
-                      textAlign: 'center', 
-                      padding: '40px', 
+                      textAlign: 'center',
+                      padding: '40px',
                       color: '#666',
                       background: '#f8f9fa',
                       borderRadius: '6px'
                     }}>
-                      <i className="fas fa-inbox" style={{fontSize: '2rem', marginBottom: '10px'}}></i>
+                      <i className="fas fa-inbox" style={{ fontSize: '2rem', marginBottom: '10px' }}></i>
                       <p>Belum ada hasil analisis</p>
                       <p>Klik "Mulai Analisis" untuk menganalisis chat history</p>
                     </div>
                   ) : (
-                    <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                       {analysisResults.map((report, index) => (
-                        <div 
+                        <div
                           key={index}
                           className="customer-item"
-                          onClick={() => viewReport(report.phoneNumber)}
-                          style={{cursor: 'pointer', marginBottom: '10px'}}
+                          style={{ marginBottom: '10px' }}
                         >
-                          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                            <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div onClick={() => viewReport(report.phoneNumber)} style={{ cursor: 'pointer' }}>
                               <h4>{report.phoneNumber}</h4>
-                              <p style={{fontSize: '0.9rem', color: '#666'}}>
+                              <p style={{ fontSize: '0.9rem', color: '#666' }}>
                                 Dibuat: {formatDate(report.createdAt)}
                               </p>
                             </div>
-                            <div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() => reanalyzeReport(report.phoneNumber)}
+                                disabled={isAnalyzing}
+                              >
+                                <i className="fas fa-sync-alt"></i> Re-analyze
+                              </button>
                               <span className="badge badge-primary">
                                 {(report.size / 1024).toFixed(1)} KB
                               </span>
                             </div>
                           </div>
-                          <p style={{marginTop: '8px', fontSize: '0.9rem'}}>
+                          <p style={{ marginTop: '8px', fontSize: '0.9rem' }}>
                             {report.content}
                           </p>
                         </div>
+
                       ))}
                     </div>
                   )}
@@ -426,7 +475,7 @@ export default function BotDashboard({ bot, onBack }) {
               <div className="card">
                 <div className="card-header">
                   <h3><i className="fas fa-file-alt"></i> Detail Laporan</h3>
-                  <button 
+                  <button
                     className="btn btn-outline"
                     onClick={() => setSelectedReport(null)}
                   >
@@ -434,13 +483,13 @@ export default function BotDashboard({ bot, onBack }) {
                   </button>
                 </div>
                 <div className="card-content">
-                  <div style={{marginBottom: '15px'}}>
+                  <div style={{ marginBottom: '15px' }}>
                     <h4>Nomor: {selectedReport.phoneNumber}</h4>
-                    <p style={{color: '#666'}}>
+                    <p style={{ color: '#666' }}>
                       Dibuat: {formatDate(selectedReport.createdAt)}
                     </p>
                   </div>
-                  
+
                   <div style={{
                     background: '#f8f9fa',
                     padding: '15px',
@@ -462,55 +511,55 @@ export default function BotDashboard({ bot, onBack }) {
 
       {/* Google Sheets Tab */}
       {activeTab === 'sheets' && (
-        <div className="bot-tab-content" style={{padding: '20px'}}>
+        <div className="bot-tab-content" style={{ padding: '20px' }}>
           <div className="card">
             <div className="card-header">
               <h3><i className="fab fa-google"></i> Konfigurasi Google Sheets</h3>
             </div>
             <div className="card-content">
-              <div style={{marginBottom: '20px'}}>
-                <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                   Spreadsheet ID
                 </label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" 
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
                   value={sheetsConfig.spreadsheetId}
-                  onChange={(e) => setSheetsConfig({...sheetsConfig, spreadsheetId: e.target.value})}
+                  onChange={(e) => setSheetsConfig({ ...sheetsConfig, spreadsheetId: e.target.value })}
                 />
-                <small style={{color: '#666'}}>
+                <small style={{ color: '#666' }}>
                   Ambil dari URL Google Sheets: https://docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit
                 </small>
               </div>
-              
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px'}}>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
                 <div>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                     Nama Sheet
                   </label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
+                  <input
+                    type="text"
+                    className="form-control"
                     value={sheetsConfig.sheetName}
-                    onChange={(e) => setSheetsConfig({...sheetsConfig, sheetName: e.target.value})}
+                    onChange={(e) => setSheetsConfig({ ...sheetsConfig, sheetName: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label style={{display: 'block', marginBottom: '5px', fontWeight: '500'}}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                     Credentials Path
                   </label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
+                  <input
+                    type="text"
+                    className="form-control"
                     value={sheetsConfig.credentialsPath}
-                    onChange={(e) => setSheetsConfig({...sheetsConfig, credentialsPath: e.target.value})}
+                    onChange={(e) => setSheetsConfig({ ...sheetsConfig, credentialsPath: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div style={{display: 'flex', gap: '10px', marginBottom: '20px'}}>
-                <button 
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <button
                   className="btn btn-primary"
                   onClick={saveSheetsConfig}
                   disabled={loading}
@@ -518,8 +567,8 @@ export default function BotDashboard({ bot, onBack }) {
                   <i className="fas fa-save"></i>
                   {loading ? ' Menyimpan...' : ' Simpan Konfigurasi'}
                 </button>
-                
-                <button 
+
+                <button
                   className="btn btn-success"
                   onClick={uploadToSheets}
                   disabled={isUploadingSheets || !sheetsConfig.spreadsheetId}
@@ -539,11 +588,11 @@ export default function BotDashboard({ bot, onBack }) {
                 }}>
                   <i className="fas fa-check-circle"></i> Google Sheets telah dikonfigurasi
                   <br />
-                  <a 
+                  <a
                     href={`https://docs.google.com/spreadsheets/d/${sheetsConfig.spreadsheetId}`}
-                    target="_blank" 
+                    target="_blank"
                     rel="noopener noreferrer"
-                    style={{color: '#155724'}}
+                    style={{ color: '#155724' }}
                   >
                     <i className="fas fa-external-link-alt"></i> Buka Spreadsheet
                   </a>
@@ -557,7 +606,7 @@ export default function BotDashboard({ bot, onBack }) {
               <h3><i className="fas fa-info-circle"></i> Cara Penggunaan</h3>
             </div>
             <div className="card-content">
-              <ol style={{paddingLeft: '20px'}}>
+              <ol style={{ paddingLeft: '20px' }}>
                 <li>Buat Google Spreadsheet baru atau gunakan yang sudah ada</li>
                 <li>Copy Spreadsheet ID dari URL</li>
                 <li>Pastikan file credentials JSON ada di path yang benar</li>
@@ -569,6 +618,8 @@ export default function BotDashboard({ bot, onBack }) {
           </div>
         </div>
       )}
+
+
 
       <style jsx>{`
         .bot-tabs {
@@ -637,4 +688,6 @@ export default function BotDashboard({ bot, onBack }) {
       `}</style>
     </div>
   );
+
+
 }

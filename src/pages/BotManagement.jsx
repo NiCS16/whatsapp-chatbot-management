@@ -561,11 +561,11 @@ export default function BotManagement({ onManageBot }) {
                 />
               </div>
               <div className="form-group">
-                <label>Allowed Numbers*</label>
+                <label>Phone Number*</label>
                 <textarea
                   value={newBot.allowedNumbers}
                   onChange={(e) => setNewBot({ ...newBot, allowedNumbers: e.target.value })}
-                  placeholder="Enter phone numbers separated by commas (e.g., +628123456789, +628987654321)"
+                  placeholder="Enter phone number"
                   rows="3"
                 />
               </div>
