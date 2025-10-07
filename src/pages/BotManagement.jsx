@@ -48,6 +48,30 @@ export default function BotManagement({ onManageBot }) {
     }
   };
 
+  const updateBotDelay = async (botName, delaySeconds) => {
+  const sec = parseInt(delaySeconds, 10);
+  if (isNaN(sec) || sec < 0 || sec > 60) {
+    alert('Delay harus antara 0–60 detik');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/bots/${botName}/delay`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ responseDelay: sec })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update delay');
+
+    console.log(`✅ Delay untuk bot ${botName} diupdate jadi ${sec}s`);
+    await fetchBots(); // refresh daftar bot
+  } catch (err) {
+    setError(err.message);
+  }
+};
+
   // Fetch running bots to get real running status
   const fetchRunningBots = async () => {
     try {
@@ -460,15 +484,17 @@ export default function BotManagement({ onManageBot }) {
 
       <div className="table-responsive">
         <table className="table">
-          <thead>
-            <tr>
-              <th>Bot Name</th>
-              <th>Description</th>
-              <th>Status</th>
-              <th>Running Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
+         <thead>
+  <tr>
+    <th>Bot Name</th>
+    <th>Description</th>
+    <th>Status</th>
+    <th>Running Status</th>
+    <th>Delay (sec)</th> {/* 👈 tambahan */}
+    <th>Actions</th>
+  </tr>
+</thead>
+
           <tbody>
             {filteredBots.length === 0 ? (
               <tr>
@@ -508,6 +534,17 @@ export default function BotManagement({ onManageBot }) {
                         </div>
                       )}
                     </td>
+
+                      <td>
+    <input
+      type="number"
+      min="0"
+      max="60"
+      defaultValue={(bot.config?.responseDelay || 0) / 1000}
+      style={{ width: '60px', marginRight: '5px' }}
+      onBlur={(e) => updateBotDelay(bot.name, e.target.value)}
+    /> s
+  </td>
                     <td>
                       <div className="action-buttons">
                         {actions.map((action, index) => (
