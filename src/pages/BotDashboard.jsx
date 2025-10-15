@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-
+import BotScheduleSettings from "./BotScheduleSettings";
 export default function BotDashboard({ bot, onBack }) {
   const API_BASE = 'http://localhost:3001';
 
   const [activeTab, setActiveTab] = useState('overview');
+  
   const [currentBot, setCurrentBot] = useState(bot);
   const [loading, setLoading] = useState(false);
 
@@ -287,13 +288,13 @@ export default function BotDashboard({ bot, onBack }) {
       </div>
 
       <div className="bot-tabs">
-        {['overview','prompt','analysis','sheets','admin'].map(tab => (
+        {['overview','prompt','analysis','sheets','admin','schedule'].map(tab => (
           <div
             key={tab}
             className={`bot-tab ${activeTab===tab?'active':''}`}
             onClick={()=>setActiveTab(tab)}
           >
-            {tab==='overview'?'Overview':tab==='prompt'?'AI Prompt':tab==='analysis'?'Analisis Chat':tab==='sheets'?'Google Sheets':'Admin Number'}
+            {tab==='schedule'?'Atur Jadwal':tab==='overview'?'Overview':tab==='prompt'?'AI Prompt':tab==='analysis'?'Analisis Chat':tab==='sheets'?'Google Sheets':'Admin Number'}
           </div>
         ))}
       </div>
@@ -318,7 +319,12 @@ export default function BotDashboard({ bot, onBack }) {
           </div>
         </div>
       )}
-
+      {/* SCHEDULE */}
+{activeTab==='schedule' && (
+  <div className="bot-tab-content" style={{padding:'20px'}}>
+    <BotScheduleSettings bot={currentBot} />
+  </div>
+)}
       {/* AI PROMPT */}
       {activeTab==='prompt' && (
         <div className="bot-tab-content" style={{padding:'20px'}}>
