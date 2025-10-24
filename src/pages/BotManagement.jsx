@@ -18,8 +18,23 @@ export default function BotManagement({ onManageBot }) {
   const [qrPollInterval, setQrPollInterval] = useState(null);
   const [runningBots, setRunningBots] = useState(new Set());
   const [lastQrHash, setLastQrHash] = useState(null); // Track QR changes
+const [credits, setCredits] = useState(null);
+const [loadingCredits, setLoadingCredits] = useState(true);
 
   const API_BASE = "http://localhost:3001";
+const fetchCredits = async () => {
+  try {
+    setLoadingCredits(true);
+    const res = await fetch(`${API_BASE}/api/openrouter/credits`);
+    if (!res.ok) throw new Error('Failed to fetch OpenRouter credits');
+    const data = await res.json();
+    if (data.success) setCredits(data.data);
+  } catch (err) {
+    console.error('Error fetching credits:', err);
+  } finally {
+    setLoadingCredits(false);
+  }
+};
 
   // Generate simple hash for QR data to detect changes
   const generateQrHash = (qrString) => {
@@ -141,16 +156,21 @@ export default function BotManagement({ onManageBot }) {
   useEffect(() => {
     fetchBots();
     fetchRunningBots();
+    fetchCredits();
+const creditsInterval = setInterval(fetchCredits, 60000);
 
     // Set up periodic refresh for running status
     const refreshInterval = setInterval(() => {
       fetchRunningBots();
     }, 5000);
 
+    
     // Clean up intervals on unmount
     return () => {
       if (qrPollInterval) clearInterval(qrPollInterval);
       clearInterval(refreshInterval);
+        clearInterval(creditsInterval);
+
     };
   }, []);
 
@@ -451,17 +471,35 @@ export default function BotManagement({ onManageBot }) {
 
   return (
     <div className="page active">
-      <div className="page-header">
-        <h1 className="page-title">
-          <i className="fas fa-robot"></i> Bot Management
-          <span className="bot-count">
-            {bots.length} total, {runningBots.size} running
-          </span>
-        </h1>
-        <button className="btn btn-primary" onClick={showAddBotModal}>
-          <i className="fas fa-plus"></i> Add New Bot
-        </button>
-      </div>
+     <div className="page-header">
+  <div>
+    <h1 className="page-title">
+      <i className="fas fa-robot"></i> Bot Management
+      <span className="bot-count">
+        {bots.length} total, {runningBots.size} running
+      </span>
+    </h1>
+    <div style={{
+      fontSize: '0.9rem',
+      color: '#4A5568',
+      marginTop: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    }}>
+      <i className="fas fa-coins"></i>
+      {loadingCredits
+        ? 'Loading credits...'
+        : credits
+          ? <>💰 <strong>${credits.remaining_credits.toFixed(2)}</strong> / ${credits.total_credits.toFixed(2)}</>
+          : 'Failed to load credits'}
+    </div>
+  </div>
+  <button className="btn btn-primary" onClick={showAddBotModal}>
+    <i className="fas fa-plus"></i> Add New Bot
+  </button>
+</div>
+
 
       {error && (
         <div className="alert alert-error">
