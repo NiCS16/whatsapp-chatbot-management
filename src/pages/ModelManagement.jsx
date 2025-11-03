@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 const ModelManagement = () => {
   const [models, setModels] = useState([]);
   const [usedModels, setUsedModels] = useState([]);
+  const [activeModel, setActiveModel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedModel, setSelectedModel] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortFreeFirst, setSortFreeFirst] = useState(false);
-  const [showUsedModels, setShowUsedModels] = useState(true); // <-- state baru untuk hide/show
+  const [showUsedModels, setShowUsedModels] = useState(true);
+  const [showActiveModel, setShowActiveModel] = useState(true);
 
   const API_BASE = "http://localhost:3001";
 
@@ -17,6 +19,18 @@ const ModelManagement = () => {
     fetchModels();
     fetchUsedModels();
   }, []);
+
+  useEffect(() => {
+    // Set active model dari used models yang paling baru
+    if (usedModels.length > 0) {
+      const latestUsedModel = usedModels[usedModels.length - 1]; // Yang terakhir adalah yang paling baru
+      setActiveModel({
+        id: latestUsedModel.model,
+        timestamp: latestUsedModel.timestamp,
+        isFree: latestUsedModel.model.includes(':free')
+      });
+    }
+  }, [usedModels]);
 
   const fetchModels = async () => {
     try {
@@ -57,6 +71,10 @@ const ModelManagement = () => {
       if (!response.ok) throw new Error('Failed to set default model');
       
       setSelectedModel(modelName);
+      // Refresh used models untuk mendapatkan yang terbaru
+      setTimeout(() => {
+        fetchUsedModels();
+      }, 500);
       alert(`Default model set to: ${modelName}`);
     } catch (err) {
       setError(err.message);
@@ -69,6 +87,16 @@ const ModelManagement = () => {
 
   const toggleUsedModels = () => {
     setShowUsedModels(!showUsedModels);
+  };
+
+  const toggleActiveModel = () => {
+    setShowActiveModel(!showActiveModel);
+  };
+
+  // Dapatkan detail model dari active model ID
+  const getActiveModelDetails = () => {
+    if (!activeModel) return null;
+    return models.find(model => model.id === activeModel.id);
   };
 
   const filteredModels = models
@@ -84,6 +112,8 @@ const ModelManagement = () => {
       if (!aFree && bFree) return 1;
       return 0;
     });
+
+  const activeModelDetails = getActiveModelDetails();
 
   if (loading) {
     return (
@@ -125,6 +155,91 @@ const ModelManagement = () => {
         </div>
       )}
 
+      {/* Active Model Section */}
+      <div className="card" style={{ marginBottom: '2rem', borderLeft: '4px solid #10B981' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <h3>
+            <i className="fas fa-play-circle" style={{ color: '#10B981' }}></i> Currently Active Model
+            {activeModel && <span className="badge badge-success">Active</span>}
+          </h3>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-sm btn-outline-success" onClick={fetchUsedModels}>
+              <i className="fas fa-refresh"></i> Refresh
+            </button>
+            <button className="btn btn-sm btn-outline-primary" onClick={toggleActiveModel}>
+              {showActiveModel ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
+        {showActiveModel && (
+          <div className="card-body">
+            {!activeModel ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <i className="fas fa-exclamation-triangle" style={{ fontSize: '2rem', color: '#6B7280', marginBottom: '1rem' }}></i>
+                <p>No active model detected. Please set a default model to start using.</p>
+              </div>
+            ) : (
+              <div className="active-model-info">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#065F46' }}>
+                      {activeModelDetails ? activeModelDetails.name : activeModel.id}
+                    </h4>
+                    <code style={{ 
+                      background: '#ECFDF5', 
+                      color: '#065F46', 
+                      padding: '0.5rem', 
+                      borderRadius: '4px',
+                      fontSize: '0.9rem'
+                    }}>
+                      {activeModel.id}
+                    </code>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="badge badge-success" style={{ fontSize: '0.8rem' }}>
+                      ACTIVE
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '0.5rem' }}>
+                      Last used: {new Date(activeModel.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  {activeModelDetails?.context_length && (
+                    <div className="model-stat">
+                      <span className="stat-label">Context Length:</span>
+                      <span className="stat-value">{activeModelDetails.context_length.toLocaleString()} tokens</span>
+                    </div>
+                  )}
+                  {activeModelDetails?.pricing && (
+                    <div className="model-stat">
+                      <span className="stat-label">Pricing:</span>
+                      <span className="stat-value">
+                        ${activeModelDetails.pricing.prompt}/1K prompt<br/>
+                        ${activeModelDetails.pricing.completion}/1K completion
+                      </span>
+                    </div>
+                  )}
+                  {activeModel.isFree && (
+                    <div className="model-stat">
+                      <span className="stat-label">Type:</span>
+                      <span className="stat-value badge badge-success">Free Tier</span>
+                    </div>
+                  )}
+                  {!activeModelDetails && (
+                    <div className="model-stat">
+                      <span className="stat-label">Status:</span>
+                      <span className="stat-value badge badge-warning">Details not available</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Used Models Section */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -142,12 +257,23 @@ const ModelManagement = () => {
               <p>No models used yet. Models will be automatically tracked when used.</p>
             ) : (
               <div className="used-models-list">
-                {usedModels.slice(-10).reverse().map((entry, index) => (
-                  <div key={index} className="used-model-item">
-                    <span className="model-name">{entry.model}</span>
-                    <span className="timestamp">{new Date(entry.timestamp).toLocaleString()}</span>
-                  </div>
-                ))}
+                {usedModels.slice(-10).reverse().map((entry, index) => {
+                  const isActive = activeModel && activeModel.id === entry.model;
+                  return (
+                    <div 
+                      key={index} 
+                      className={`used-model-item ${isActive ? 'active-used-model' : ''}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="model-name">{entry.model}</span>
+                        {isActive && (
+                          <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Active</span>
+                        )}
+                      </div>
+                      <span className="timestamp">{new Date(entry.timestamp).toLocaleString()}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -188,12 +314,16 @@ const ModelManagement = () => {
             ) : (
               filteredModels.map(model => {
                 const isFree = model.id.includes(':free');
+                const isActive = activeModel && activeModel.id === model.id;
                 return (
-                  <tr key={model.id}>
+                  <tr key={model.id} className={isActive ? 'active-model-row' : ''}>
                     <td>
                       <code>{model.id}</code>
                       {isFree && (
                         <span style={{ marginLeft: '8px' }} className="badge badge-success">Free</span>
+                      )}
+                      {isActive && (
+                        <span style={{ marginLeft: '8px' }} className="badge badge-success">Active</span>
                       )}
                     </td>
                     <td><strong>{model.name}</strong></td>
@@ -216,11 +346,12 @@ const ModelManagement = () => {
                     </td>
                     <td>
                       <button
-                        className="btn btn-primary btn-sm"
+                        className={`btn ${isActive ? 'btn-success' : 'btn-primary'} btn-sm`}
                         onClick={() => setDefaultModel(model.id)}
                         title={`Set ${model.id} as default`}
+                        disabled={isActive}
                       >
-                        <i className="fas fa-check"></i> Use
+                        <i className="fas fa-check"></i> {isActive ? 'Active' : 'Use'}
                       </button>
                     </td>
                   </tr>
@@ -232,6 +363,36 @@ const ModelManagement = () => {
       </div>
 
       <style jsx>{`
+        .active-model-info {
+          background: #F0FDF4;
+          padding: 1rem;
+          border-radius: 8px;
+          border: 1px solid #D1FAE5;
+        }
+        .model-stat {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        .stat-label {
+          font-size: 0.8rem;
+          color: #6B7280;
+          font-weight: 600;
+        }
+        .stat-value {
+          font-size: 0.9rem;
+          color: #111827;
+          font-weight: 500;
+        }
+        .active-model-row {
+          background-color: #F0FDF4 !important;
+          border-left: 4px solid #10B981;
+        }
+        .active-used-model {
+          background: #F0FDF4 !important;
+          border-left-color: #10B981 !important;
+          border-left-width: 4px !important;
+        }
         .used-models-list {
           display: flex;
           flex-direction: column;
@@ -271,6 +432,14 @@ const ModelManagement = () => {
         .badge-success {
           background: #c6f6d5;
           color: #22543d;
+        }
+        .badge-warning {
+          background: #fef3c7;
+          color: #92400e;
+        }
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
       `}</style>
     </div>

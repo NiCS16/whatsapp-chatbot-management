@@ -434,7 +434,7 @@ export default function BotDashboard({ bot, onBack }) {
                 </div>
               )}
               <div style={{marginTop:'20px'}}>
-                <h4>Nomor Diperbolehkan:</h4>
+                <h4>Nomor Admin:</h4>
                 <ul>{adminConfig.allowedNumbers.map(n=><li key={n}>{n}</li>)}</ul>
               </div>
             </div>

@@ -25,13 +25,7 @@ const Navbar = ({ activeTab, setActiveTab, showBotDashboard, selectedBot }) => {
           </button>
         )}
         
-        <button 
-          className={activeTab === 'analytics' ? 'nav-item active' : 'nav-item'}
-          onClick={() => setActiveTab('analytics')}
-        >
-          <i className="fas fa-chart-bar"></i>
-          <span>Analytics</span>
-        </button>
+
         
         <button 
           className={activeTab === 'models' ? 'nav-item active' : 'nav-item'}

@@ -151,7 +151,7 @@ export default function AutoDeleteSettings() {
       if (data.success) {
         showMessage(
           "success",
-          `${typeName} berhasil dihapus. Total: ${data.totalDeleted || 0} file`
+          `${typeName} berhasil dijalankan pada ${new Date(data.lastRun).toLocaleString('id-ID')}`
         );
         fetchStatus();
       } else {
@@ -317,14 +317,8 @@ export default function AutoDeleteSettings() {
                 </div>
               </div>
               <div style={styles.statItem}>
-                <div style={styles.statLabel}>Total Terhapus</div>
-                <div style={styles.statValue}>
-                  {typeStatus.totalDeleted || 0}
-                </div>
-              </div>
-              <div style={styles.statItem}>
                 <div style={styles.statLabel}>Terakhir Dijalankan</div>
-                <div style={styles.statValue}>
+                <div style={styles.statValueSmall}>
                   {formatDate(typeStatus.lastRun)}
                 </div>
               </div>
@@ -596,7 +590,7 @@ const styles = {
   },
   statsContainer: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    gridTemplateColumns: "repeat(2, 1fr)",
     gap: "16px",
     marginBottom: "20px",
     padding: "16px",
@@ -613,8 +607,13 @@ const styles = {
     fontWeight: "500",
   },
   statValue: {
-    fontSize: "20px",
+    fontSize: "24px",
     fontWeight: "700",
+    color: "#111827",
+  },
+  statValueSmall: {
+    fontSize: "13px",
+    fontWeight: "600",
     color: "#111827",
   },
   buttonGroup: {
